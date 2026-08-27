@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Alphabet Algebra Maze - GEMA Edition</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root{
+  --red:#ff3b3b;
+  --dimred:#7a1414;
+  --green:#2dff6a;
+  --amber:#ffcf3d;
+  --cyan:#4dd2ff;
+  --ink:#050303;
+  --panel:rgba(8,2,2,0.94);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{
+  margin:0;padding:0;width:100%;height:100%;
+  background:#000;overflow:hidden;
+  font-family:'Press Start 2P',monospace;
+  color:var(--red);
+  user-select:none;-webkit-user-select:none;
+  touch-action:none;
+}
+#gameContainer{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;}
+#viewWrap{position:relative;line-height:0;}
+#screen{image-rendering:pixelated;image-rendering:crisp-edges;display:block;background:#000;}
+#scanlines{
+  position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(rgba(0,0,0,0) 0px, rgba(0,0,0,0) 1px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 3px);
+  mix-blend-mode:multiply;
+}
+#vignette{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 min(18vw,140px) min(6vw,50px) rgba(0,0,0,0.35);}
+#critOverlay{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center, rgba(255,0,0,0) 38%, rgba(255,0,0,0.6) 100%);}
+#critOverlay.active{animation:critPulse 0.9s ease-in-out infinite;}
+@keyframes critPulse{0%,100%{opacity:0.22;}50%{opacity:0.8;}}
+
+/* ---------- HUD ---------- */
+#hud{position:absolute;inset:0;pointer-events:none;font-size:8px;}
+#hud > *{pointer-events:auto;}
+.hudTopLeft{position:absolute;top:2%;left:2%;width:44%;max-width:260px;}
+.hpLabel{color:var(--amber);font-size:7px;margin-bottom:3px;letter-spacing:1px;}
+.hpBarOuter{border:2px solid #500;background:#1a0505;height:16px;box-shadow:0 0 8px rgba(255,0,0,0.4);}
+.hpBarInner{height:100%;width:100%;background:var(--green);transition:width 0.15s linear, background 0.3s;}
+#hpNum{color:var(--red);font-size:7px;margin-top:3px;}
+
+.hudTopRight{position:absolute;top:2%;right:2%;text-align:right;}
+#progressText{color:var(--amber);font-size:8px;text-shadow:0 0 6px rgba(255,207,61,0.6);}
+
+/* Doubled Mini-map Size & Border Contrast */
+#minimapWrap{
+  position:absolute;bottom:2%;right:2%;
+  border:3px solid var(--red);
+  background:rgba(5,2,2,0.92);
+  box-shadow:0 0 14px rgba(255,59,59,0.4);
+}
+#minimap{display:block;}
+
+#notebookTab{
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  background:#1a0505;border:2px solid var(--green);border-left:none;
+  color:var(--green);font-family:'Press Start 2P',monospace;font-size:8px;
+  padding:8px 6px;cursor:pointer;writing-mode:vertical-rl;letter-spacing:1px;
+}
+#notebookPanel{
+  position:absolute;left:0;top:50%;transform:translate(-100%,-50%);
+  width:min(46vw,260px);max-height:70vh;overflow-y:auto;
+  background:var(--panel);border:2px solid var(--green);
+  padding:10px;transition:transform 0.25s ease;
+  box-shadow:0 0 20px rgba(45,255,106,0.25);
+}
+#notebookPanel.open{transform:translate(0,-50%);}
+#notebookPanel h3{color:var(--green);font-size:8px;margin:0 0 8px;}
+#notebookGrid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.nbChip{background:#031a0c;border:1px solid var(--green);color:var(--green);font-size:7px;padding:4px;text-align:center;}
+
+#helpBtn{
+  position:absolute;bottom:2%;left:2%;width:22px;height:22px;border-radius:50%;
+  border:2px solid var(--amber);color:var(--amber);background:#1a0505;
+  display:flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;
+}
+#helpTip{
+  position:absolute;bottom:calc(2% + 30px);left:2%;width:min(70vw,300px);
+  background:var(--panel);border:2px solid var(--amber);color:var(--amber);
+  font-size:7px;line-height:1.7;padding:8px;display:none;
+}
+#helpTip.show{display:block;}
+
+#toast{
+  position:absolute;top:14%;left:50%;transform:translateX(-50%);
+  color:var(--amber);font-size:9px;text-align:center;text-shadow:0 0 10px rgba(255,207,61,0.7);
+  opacity:0;transition:opacity 0.4s;pointer-events:none;white-space:nowrap;
+}
+#toast.show{opacity:1;}
+
+/* ---------- Touch controls ---------- */
+#touchControls{position:absolute;inset:0;pointer-events:none;display:none;}
+#touchControls.active{display:block;}
+.tbtn{
+  position:absolute;pointer-events:auto;
+  width:56px;height:56px;border-radius:10px;
+  background:rgba(122,20,20,0.35);border:2px solid var(--red);
+  color:var(--red);font-size:14px;display:flex;align-items:center;justify-content:center;
+}
+#tUp{bottom:96px;left:70px;}
+#tDown{bottom:26px;left:70px;}
+#tLeft{bottom:61px;left:8px;}
+#tRight{bottom:61px;left:132px;}
+#tMash{bottom:40px;right:16px;width:96px;height:96px;border-radius:50%;font-size:11px;background:rgba(255,59,59,0.25);}
+
+/* ---------- Overlays (start/win/dead) ---------- */
+.fullOverlay{
+  position:fixed;inset:0;background:rgba(2,0,0,0.97);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:20px;z-index:50;
+}
+.hidden{display:none !important;}
+h1.title{
+  color:var(--red);font-size:clamp(16px,5vw,32px);letter-spacing:2px;
+  text-shadow:0 0 12px rgba(255,59,59,0.8),0 0 30px rgba(255,59,59,0.4);
+  margin:0 0 18px;
+}
+.subtitle{color:var(--amber);font-size:clamp(7px,2vw,10px);margin-bottom:22px;line-height:2;max-width:540px;}
+.retroBtn{
+  font-family:'Press Start 2P',monospace;background:#1a0505;color:var(--green);
+  border:2px solid var(--green);padding:14px 22px;font-size:clamp(9px,2.4vw,12px);
+  cursor:pointer;box-shadow:0 0 14px rgba(45,255,106,0.4);letter-spacing:1px;
+}
+.retroBtn:active{transform:scale(0.96);}
+
+#winTable{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(56px,1fr));gap:6px;
+  max-width:640px;margin:18px 0;width:90%;
+}
+#winTable div{background:#031a0c;border:1px solid var(--green);color:var(--green);font-size:7px;padding:5px 2px;}
+#winConfettiCanvas{position:absolute;inset:0;pointer-events:none;z-index:1;}
+
+/* ---------- Puzzle modal ---------- */
+#puzzleModal{
+  position:fixed;inset:0;background:rgba(0,0,0,0.8);
+  display:flex;align-items:center;justify-content:center;z-index:40;
+  opacity:0;pointer-events:none;transition:opacity 0.15s;
+}
+#puzzleModal.show{opacity:1;pointer-events:auto;}
+#puzzleBox{
+  background:var(--panel);border:3px solid var(--green);box-shadow:0 0 26px rgba(45,255,106,0.5);
+  padding:20px;width:min(92vw,440px);text-align:center;color:var(--green);position:relative;
+}
+#puzzleLetter{font-size:30px;color:var(--green);text-shadow:0 0 14px rgba(45,255,106,0.8);}
+#puzzleEq{font-size:12px;margin:10px 0 12px;color:#fff;line-height:1.5;}
+#puzzleDeps{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-bottom:12px;min-height:10px;}
+.depChip{font-size:7px;padding:4px 6px;border-radius:2px;}
+.depChip.known{background:#031a0c;border:1px solid var(--green);color:var(--green);}
+.depChip.unknown{background:#1a0505;border:1px dashed var(--red);color:var(--red);}
+#puzzleInput{
+  width:75%;font-family:'Press Start 2P',monospace;background:#000;border:2px solid var(--green);
+  color:var(--green);font-size:15px;padding:8px;text-align:center;
+}
+#puzzleFeedback{min-height:14px;font-size:9px;margin:10px 0;}
+#puzzleFeedback.good{color:var(--green);}
+#puzzleFeedback.bad{color:var(--red);}
+.puzzleBtnRow{display:flex;gap:10px;justify-content:center;margin-top:10px;flex-wrap:wrap;}
+.smallBtn{
+  font-family:'Press Start 2P',monospace;font-size:8px;padding:8px 12px;cursor:pointer;
+  background:#031a0c;color:var(--green);border:2px solid var(--green);
+}
+.smallBtn.cancel{background:#1a0505;color:var(--red);border-color:var(--red);}
+
+/* ---------- Scare / Combat overlay ---------- */
+#scareOverlay{
+  position:fixed;inset:0;background:rgba(20,0,0,0.55);z-index:45;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity 0.08s;
+  cursor:pointer;
+}
+#scareOverlay.show{opacity:1;pointer-events:auto;}
+#scareOverlay.shaking{animation:shake 0.28s linear infinite;}
+@keyframes shake{
+  0%{transform:translate(0,0);}20%{transform:translate(-8px,5px);}
+  40%{transform:translate(7px,-6px);}60%{transform:translate(-5px,-4px);}
+  80%{transform:translate(8px,4px);}100%{transform:translate(0,0);}
+}
+#monsterCanvas{image-rendering:pixelated;width:min(46vw,240px);height:min(46vw,240px);transition:transform 0.05s;}
+#monsterCanvas.punch{animation:punch 0.12s ease-out;}
+#monsterCanvas.defeat{animation:monsterSpinShrink 0.6s cubic-bezier(0.5,0,0.75,0) forwards;}
+@keyframes monsterSpinShrink{
+  0%{transform:scale(1) rotate(0deg);opacity:1;filter:brightness(1);}
+  40%{transform:scale(1.2) rotate(360deg);opacity:0.9;filter:brightness(2) hue-rotate(180deg);}
+  100%{transform:scale(0) rotate(720deg);opacity:0;filter:brightness(4);}
+}
+@keyframes punch{0%{transform:scale(1);}40%{transform:scale(0.9) rotate(-2deg);}100%{transform:scale(1);}}
+#mashPrompt{color:var(--red);font-size:clamp(10px,2.8vw,16px);margin-top:14px;text-shadow:0 0 10px rgba(255,59,59,0.9);letter-spacing:1px;text-align:center;}
+#mashMeterOuter{width:min(70vw,320px);height:18px;border:2px solid var(--amber);background:#1a0f00;margin-top:14px;}
+#mashMeterInner{height:100%;width:0%;background:var(--amber);transition:width 0.05s linear;}
+#confettiCanvas{position:absolute;inset:0;pointer-events:none;z-index:48;}
+
+@media (hover:none) and (pointer:coarse){
+  #touchControls{display:block;}
+}
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <div id="viewWrap">
+    <canvas id="screen" width="320" height="180"></canvas>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+    <div id="critOverlay"></div>
+  </div>
+
+  <div id="hud">
+    <div class="hudTopLeft">
+      <div class="hpLabel">HEALTH</div>
+      <div class="hpBarOuter"><div id="hpFill" class="hpBarInner"></div></div>
+      <div id="hpNum">100</div>
+    </div>
+    <div class="hudTopRight">
+      <div id="progressText">LETTERS 0/26</div>
+    </div>
+    <!-- Mini-map Canvas doubled to 224x224 -->
+    <div id="minimapWrap"><canvas id="minimap" width="224" height="224"></canvas></div>
+    <div id="notebookTab">NOTEBOOK</div>
+    <div id="notebookPanel">
+      <h3>SOLVED LETTERS</h3>
+      <div id="notebookGrid"></div>
+    </div>
+    <div id="helpBtn">?</div>
+    <div id="helpTip">
+      ARROWS / WASD: Move &amp; Turn<br>
+      Letters A-Z are laid out sequentially along the maze path!<br>
+      Dismissed puzzles have a 10-second cooldown so you can safely turn around.<br>
+      Clear all 26 letters to unlock the Final GEMA Challenge!
+    </div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="touchControls">
+    <div class="tbtn" id="tUp">▲</div>
+    <div class="tbtn" id="tDown">▼</div>
+    <div class="tbtn" id="tLeft">◀</div>
+    <div class="tbtn" id="tRight">▶</div>
+    <div class="tbtn" id="tMash">TAP!</div>
+  </div>
+</div>
+
+<!-- START SCREEN -->
+<div id="startScreen" class="fullOverlay">
+  <h1 class="title">ALPHABET<br>ALGEBRA MAZE</h1>
+  <div class="subtitle">
+    Letters A through Z are placed sequentially along a continuous winding corridor!<br>
+    Solve letters in order (A → B → C ... → Z). Dismissed/failed letters enter a 10s cooldown.<br>
+    Solve all 26 letters to face the <b>Final Master GEMA Challenge</b>!
+  </div>
+  <button class="retroBtn" id="startBtn">▶ ENTER THE MAZE</button>
+</div>
+
+<!-- WIN SCREEN -->
+<div id="winOverlay" class="fullOverlay hidden">
+  <canvas id="winConfettiCanvas"></canvas>
+  <div style="z-index:2;display:flex;flex-direction:column;align-items:center;">
+    <h1 class="title" style="color:var(--green);text-shadow:0 0 12px rgba(45,255,106,0.8),0 0 30px rgba(45,255,106,0.4);">VICTORY ACHIEVED!</h1>
+    <div class="subtitle" style="color:#fff;">You solved all 26 letters AND conquered the Master GEMA Challenge!</div>
+    <div id="winTable"></div>
+    <button class="retroBtn" id="playAgainBtn">↺ NEW MAZE</button>
+  </div>
+</div>
+
+<!-- DEAD OVERLAY -->
+<div id="deadOverlay" class="fullOverlay hidden" style="background:rgba(20,0,0,0.9);">
+  <h1 class="title" style="font-size:clamp(13px,4vw,22px);">YOU BLACKED OUT...</h1>
+  <div class="subtitle">Dragged back to the entrance. Solved letters remain intact.</div>
+</div>
+
+<!-- PUZZLE MODAL -->
+<div id="puzzleModal">
+  <div id="puzzleBox">
+    <div id="puzzleLetter">A</div>
+    <div id="puzzleEq">= 5</div>
+    <div id="puzzleDeps"></div>
+    <input id="puzzleInput" type="number" inputmode="numeric" placeholder="?">
+    <div id="puzzleFeedback"></div>
+    <div class="puzzleBtnRow">
+      <button class="smallBtn" id="puzzleSubmit">SOLVE</button>
+      <button class="smallBtn cancel" id="puzzleCancel">NOT YET</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCARE / COMBAT OVERLAY -->
+<div id="scareOverlay">
+  <canvas id="monsterCanvas" width="64" height="64"></canvas>
+  <div id="mashPrompt">MASH SPACE / TAP SCREEN!!</div>
+  <div id="mashMeterOuter"><div id="mashMeterInner"></div></div>
+  <canvas id="confettiCanvas"></canvas>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ===================== STRICT ALPHABETICAL ALGEBRA DATA ===================== */
+const LETTER_DATA = {
+  A:{eq:"5", deps:[], value:5},
+  B:{eq:"A + 3", deps:["A"], value:8},
+  C:{eq:"2A", deps:["A"], value:10},
+  D:{eq:"B + C", deps:["B","C"], value:18},
+  E:{eq:"D ÷ 2", deps:["D"], value:9},
+  F:{eq:"E + A", deps:["E","A"], value:14},
+  G:{eq:"F − B", deps:["F","B"], value:6},
+  H:{eq:"3G", deps:["G"], value:18},
+  I:{eq:"H ÷ E", deps:["H","E"], value:2},
+  J:{eq:"I + F", deps:["I","F"], value:16},
+  K:{eq:"J − C", deps:["J","C"], value:6},
+  L:{eq:"2K", deps:["K"], value:12},
+  M:{eq:"L + D", deps:["L","D"], value:30},
+  N:{eq:"M ÷ A", deps:["M","A"], value:6},
+  O:{eq:"N + H", deps:["N","H"], value:24},
+  P:{eq:"O − J", deps:["O","J"], value:8},
+  Q:{eq:"3P", deps:["P"], value:24},
+  R:{eq:"Q ÷ G", deps:["Q","G"], value:4},
+  S:{eq:"R + M", deps:["R","M"], value:34},
+  T:{eq:"S − O", deps:["S","O"], value:10},
+  U:{eq:"T ÷ A", deps:["T","A"], value:2},
+  V:{eq:"U + Q", deps:["U","Q"], value:26},
+  W:{eq:"V − L", deps:["V","L"], value:14},
+  X:{eq:"W × I", deps:["W","I"], value:28},
+  Y:{eq:"X ÷ R", deps:["X","R"], value:7},
+  Z:{eq:"Y + U", deps:["Y","U"], value:9},
+};
+
+const MASTER_PUZZLE = {
+  isMaster: true,
+  letter: "MASTER GEMA PUZZLE",
+  eq: "[ (J − C)<sup>U</sup> + (B × Z) ÷ R ] × A − (E − G)<sup>I</sup>",
+  deps: ["J","C","U","B","Z","R","A","E","G","I"],
+  targetValue: 261
+};
+
+/* ===================== CONSTANTS ===================== */
+const IW=320, IH=180;
+const FOV = 66*Math.PI/180;
+const MOVE_SPEED=2.6, ROT_SPEED=2.6;
+const COLS=23, ROWS=23;
+const MASH_GAIN=22, MASH_DECAY=10, HEALTH_DRAIN=14, METER_MAX=100;
+const REGEN_RATE=6, CRIT_THRESHOLD=25;
+const COOLDOWN_MS = 10000;
+const MONSTER_VARIANTS=[
+  {skin:'#8a1414', eye:'#ffdd33'},
+  {skin:'#123a17', eye:'#ff3b3b'},
+  {skin:'#2a1050', eye:'#33ffcc'},
+];
+
+/* ===================== DOM ===================== */
+const canvas=document.getElementById('screen');
+const ctx=canvas.getContext('2d');
+const hpFill=document.getElementById('hpFill');
+const hpNum=document.getElementById('hpNum');
+const progressText=document.getElementById('progressText');
+const critOverlay=document.getElementById('critOverlay');
+const minimap=document.getElementById('minimap');
+const mctx=minimap.getContext('2d');
+const notebookTab=document.getElementById('notebookTab');
+const notebookPanel=document.getElementById('notebookPanel');
+const notebookGrid=document.getElementById('notebookGrid');
+const helpBtn=document.getElementById('helpBtn');
+const helpTip=document.getElementById('helpTip');
+const toast=document.getElementById('toast');
+
+const startScreen=document.getElementById('startScreen');
+const startBtn=document.getElementById('startBtn');
+const winOverlay=document.getElementById('winOverlay');
+const winTable=document.getElementById('winTable');
+const playAgainBtn=document.getElementById('playAgainBtn');
+const deadOverlay=document.getElementById('deadOverlay');
+
+const puzzleModal=document.getElementById('puzzleModal');
+const puzzleLetter=document.getElementById('puzzleLetter');
+const puzzleEq=document.getElementById('puzzleEq');
+const puzzleDeps=document.getElementById('puzzleDeps');
+const puzzleInput=document.getElementById('puzzleInput');
+const puzzleFeedback=document.getElementById('puzzleFeedback');
+const puzzleSubmit=document.getElementById('puzzleSubmit');
+const puzzleCancel=document.getElementById('puzzleCancel');
+
+const scareOverlay=document.getElementById('scareOverlay');
+const monsterCanvas=document.getElementById('monsterCanvas');
+const mctx2=monsterCanvas.getContext('2d');
+const mashMeterInner=document.getElementById('mashMeterInner');
+const confettiCanvas=document.getElementById('confettiCanvas');
+const winConfettiCanvas=document.getElementById('winConfettiCanvas');
+
+/* ===================== STATE ===================== */
+let maze=[], START_X=1, START_Y=1;
+let letterState={};
+let monsters=[];
+let activeEngagedMonster=null;
+let solvedCount=0;
+let player={x:1.5,y:1.5,angle:0,health:100};
+let zBuffer=new Array(IW).fill(9999);
+let controls={forward:false,back:false,left:false,right:false};
+let gameState='start';
+let activeLetter=null;
+let isMasterActive=false;
+let mashMeter=0;
+let isDefeating=false;
+let lastTime=0;
+let actx=null;
+let confettiParticles=[];
+let winConfettiParticles=[];
+
+Object.keys(LETTER_DATA).forEach(ch=>{
+  letterState[ch]={x:0,y:0,solved:false,value:LETTER_DATA[ch].value,snoozeUntil:0};
+});
+
+/* ===================== UTIL ===================== */
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    const t=arr[i];arr[i]=arr[j];arr[j]=t;
+  }
+  return arr;
+}
+function rand(min,max){return Math.random()*(max-min)+min;}
+function normalizeAngle(a){
+  while(a>Math.PI)a-=2*Math.PI;
+  while(a<-Math.PI)a+=2*Math.PI;
+  return a;
+}
+function showToast(msg,ms){
+  toast.textContent=msg;
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>toast.classList.remove('show'), ms||2200);
+}
+
+/* ===================== MAZE GENERATION & SEQUENTIAL PLACEMENT ===================== */
+function generateMaze(){
+  maze=Array.from({length:ROWS},()=>Array(COLS).fill(1));
+  function carve(x,y){
+    maze[y][x]=0;
+    const dirs=shuffle([[0,-2],[0,2],[-2,0],[2,0]]);
+    for(const d of dirs){
+      const nx=x+d[0], ny=y+d[1];
+      if(nx>0&&nx<COLS-1&&ny>0&&ny<ROWS-1&&maze[ny][nx]===1){
+        maze[y+d[1]/2][x+d[0]/2]=0;
+        carve(nx,ny);
+      }
+    }
+  }
+  carve(START_X,START_Y);
+  addLoops(0.08);
+}
+
+function addLoops(prob){
+  for(let y=1;y<ROWS-1;y++){
+    for(let x=1;x<COLS-1;x++){
+      if(maze[y][x]===1){
+        if(x%2===0 && y%2===1){
+          if(maze[y][x-1]===0 && maze[y][x+1]===0 && Math.random()<prob) maze[y][x]=0;
+        } else if(x%2===1 && y%2===0){
+          if(maze[y-1][x]===0 && maze[y+1][x]===0 && Math.random()<prob) maze[y][x]=0;
+        }
+      }
+    }
+  }
+}
+
+function getLinearPathCells(){
+  const pathCells = [];
+  const visited = Array.from({length: ROWS}, () => Array(COLS).fill(false));
+  
+  function dfs(x, y){
+    visited[y][x] = true;
+    pathCells.push({x, y});
+    const dirs = [[0,1], [1,0], [0,-1], [-1,0]];
+    for(const d of dirs){
+      const nx = x + d[0], ny = y + d[1];
+      if(nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1 && maze[ny][nx] === 0 && !visited[ny][nx]){
+        dfs(nx, ny);
+      }
+    }
+  }
+  dfs(START_X, START_Y);
+  return pathCells;
+}
+
+function placeLettersAndMonsters(){
+  const alphaOrder = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+  const pathCells = getLinearPathCells();
+  const letterPositions = new Set();
+
+  alphaOrder.forEach((ch, i) => {
+    const fraction = (i + 1) / (alphaOrder.length + 1);
+    const idx = Math.min(pathCells.length - 1, Math.floor(fraction * pathCells.length));
+    const c = pathCells[idx];
+    letterState[ch].x = c.x;
+    letterState[ch].y = c.y;
+    letterState[ch].solved = false;
+    letterState[ch].snoozeUntil = 0;
+    letterPositions.add(`${c.x},${c.y}`);
+  });
+
+  monsters = [];
+  const monsterCount = 6;
+  const availableMonsterCells = pathCells.filter((c, i) => !letterPositions.has(`${c.x},${c.y}`) && i > 6);
+  shuffle(availableMonsterCells);
+
+  for(let i = 0; i < Math.min(monsterCount, availableMonsterCells.length); i++){
+    const mc = availableMonsterCells[i];
+    monsters.push({
+      x: mc.x,
+      y: mc.y,
+      active: true,
+      variant: MONSTER_VARIANTS[i % MONSTER_VARIANTS.length]
+    });
+  }
+}
+
+function initialAngle(){
+  const dirs=[[1,0,0],[-1,0,Math.PI],[0,1,Math.PI/2],[0,-1,-Math.PI/2]];
+  for(const d of dirs){
+    if(maze[START_Y+d[1]] && maze[START_Y+d[1]][START_X+d[0]]===0) return d[2];
+  }
+  return 0;
+}
+
+/* ===================== COLLISION ===================== */
+function canMoveTo(x,y){
+  const pad=0.24;
+  const pts=[[x-pad,y-pad],[x+pad,y-pad],[x-pad,y+pad],[x+pad,y+pad]];
+  for(const p of pts){
+    const mx=Math.floor(p[0]), my=Math.floor(p[1]);
+    if(my<0||my>=ROWS||mx<0||mx>=COLS||maze[my][mx]===1) return false;
+  }
+  for(const m of monsters){
+    if(m.active && Math.hypot(x - (m.x + 0.5), y - (m.y + 0.5)) < 0.65){
+      return false;
+    }
+  }
+  return true;
+}
+
+/* ===================== RAYCASTING ===================== */
+function castRayDist(px,py,angle){
+  const rayDirX=Math.cos(angle), rayDirY=Math.sin(angle);
+  let mapX=Math.floor(px), mapY=Math.floor(py);
+  const deltaDistX=rayDirX===0?1e30:Math.abs(1/rayDirX);
+  const deltaDistY=rayDirY===0?1e30:Math.abs(1/rayDirY);
+  let stepX,stepY,sideDistX,sideDistY;
+  if(rayDirX<0){stepX=-1;sideDistX=(px-mapX)*deltaDistX;}else{stepX=1;sideDistX=(mapX+1-px)*deltaDistX;}
+  if(rayDirY<0){stepY=-1;sideDistY=(py-mapY)*deltaDistY;}else{stepY=1;sideDistY=(mapY+1-py)*deltaDistY;}
+  let side=0,hit=false,safety=0;
+  while(!hit && safety<120){
+    safety++;
+    if(sideDistX<sideDistY){sideDistX+=deltaDistX;mapX+=stepX;side=0;}
+    else{sideDistY+=deltaDistY;mapY+=stepY;side=1;}
+    if(mapX<0||mapX>=COLS||mapY<0||mapY>=ROWS){hit=true;}
+    else if(maze[mapY][mapX]===1){hit=true;}
+  }
+  let rawDist;
+  if(side===0) rawDist=(mapX-px+(1-stepX)/2)/rayDirX;
+  else rawDist=(mapY-py+(1-stepY)/2)/rayDirY;
+  return {rawDist:Math.abs(rawDist), side, mapX, mapY};
+}
+
+function render(now){
+  ctx.fillStyle='#2c141d';
+  ctx.fillRect(0,0,IW,IH/2);
+  ctx.fillStyle='#221d1e';
+  ctx.fillRect(0,IH/2,IW,IH/2);
+
+  const flicker=1+0.04*Math.sin(now*0.005)+0.02*Math.sin(now*0.031);
+
+  for(let col=0;col<IW;col++){
+    const cameraX=(col/IW-0.5);
+    const rayAngle=player.angle+cameraX*FOV;
+    const d=castRayDist(player.x,player.y,rayAngle);
+    const corrected=Math.max(0.05, d.rawDist*Math.cos(rayAngle-player.angle));
+    zBuffer[col]=corrected;
+    const lineH=Math.min(IH*3, IH/corrected);
+    const drawStart=Math.max(0,(IH-lineH)/2);
+    const drawEnd=Math.min(IH,(IH+lineH)/2);
+
+    let r,g,b;
+    if(d.side===0){r=170;g=45;b=55;}else{r=125;g=30;b=40;}
+    const checker=((d.mapX+d.mapY)%2===0)?1:0.85;
+    const shade=Math.max(0.35,(1-corrected/20))*checker*flicker;
+    r=Math.min(255,r*shade); g=Math.min(255,g*shade); b=Math.min(255,b*shade);
+    ctx.fillStyle=`rgb(${r|0},${g|0},${b|0})`;
+    ctx.fillRect(col,drawStart,1,drawEnd-drawStart+1);
+  }
+  drawSprites();
+}
+
+function drawSprites(){
+  const list=[];
+
+  Object.keys(letterState).forEach(ch=>{
+    const st=letterState[ch];
+    const dx=st.x+0.5-player.x, dy=st.y+0.5-player.y;
+    const dist=Math.hypot(dx,dy);
+    const ang=normalizeAngle(Math.atan2(dy,dx)-player.angle);
+    if(Math.abs(ang)<FOV/2+0.35 && dist>0.25 && dist<18){
+      list.push({type:'letter', ch, st, dist, ang});
+    }
+  });
+
+  monsters.forEach(m=>{
+    if(!m.active) return;
+    const dx=m.x+0.5-player.x, dy=m.y+0.5-player.y;
+    const dist=Math.hypot(dx,dy);
+    const ang=normalizeAngle(Math.atan2(dy,dx)-player.angle);
+    if(Math.abs(ang)<FOV/2+0.4 && dist>0.2 && dist<18){
+      list.push({type:'monster', monster:m, dist, ang});
+    }
+  });
+
+  list.sort((a,b)=>b.dist-a.dist);
+
+  for(const s of list){
+    const corrected=s.dist*Math.cos(s.ang);
+    if(corrected<0.2) continue;
+    const screenX=(0.5+s.ang/FOV)*IW;
+
+    if(s.type==='letter'){
+      const size=Math.min(IH*1.8, IH/corrected*0.55);
+      const colStart=Math.floor(screenX-size/2), colEnd=Math.floor(screenX+size/2);
+      let visible=0,total=0;
+      for(let col=colStart;col<colEnd;col++){
+        if(col<0||col>=IW) continue;
+        total++;
+        if(corrected<zBuffer[col]) visible++;
+      }
+      if(total===0 || visible/total<0.3) continue;
+
+      const top=IH/2-size/2;
+      const glow=s.st.solved? '#2dff6a' : '#ffcf3d';
+      ctx.save();
+      ctx.globalAlpha=0.9;
+      ctx.fillStyle=glow;
+      ctx.beginPath();
+      ctx.ellipse(screenX, top+size/2, size*0.26, size*0.48, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.fillStyle='#050303';
+      ctx.font=`${Math.max(6,size*0.52)}px 'Press Start 2P', monospace`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(s.ch, screenX, top+size/2+1);
+      ctx.restore();
+
+    } else if(s.type==='monster'){
+      const size=Math.min(IH*2.2, IH/corrected*1.05);
+      const top=IH/2-size/2;
+      const colStart=Math.floor(screenX-size/2), colEnd=Math.floor(screenX+size/2);
+      let visible=0,total=0;
+      for(let col=colStart;col<colEnd;col++){
+        if(col<0||col>=IW) continue;
+        total++;
+        if(corrected<zBuffer[col]) visible++;
+      }
+      if(total===0 || visible/total<0.2) continue;
+
+      ctx.save();
+      ctx.fillStyle=s.monster.variant.skin;
+      ctx.fillRect(screenX-size*0.4, top+size*0.05, size*0.8, size*0.9);
+      ctx.fillStyle=s.monster.variant.eye;
+      ctx.fillRect(screenX-size*0.26, top+size*0.3, size*0.18, size*0.16);
+      ctx.fillRect(screenX+size*0.08, top+size*0.3, size*0.18, size*0.16);
+      ctx.fillStyle='#000';
+      ctx.fillRect(screenX-size*0.18, top+size*0.35, size*0.07, size*0.07);
+      ctx.fillRect(screenX+size*0.14, top+size*0.35, size*0.07, size*0.07);
+      ctx.fillStyle='#1a0000';
+      ctx.fillRect(screenX-size*0.25, top+size*0.62, size*0.5, size*0.2);
+      ctx.fillStyle='#ffffff';
+      for(let t=0; t<4; t++){
+        ctx.fillRect(screenX-size*0.22+t*size*0.12, top+size*0.62, size*0.07, size*0.08);
+      }
+      ctx.restore();
+    }
+  }
+}
+
+/* ===================== ENLARGED HIGH-CONTRAST MINIMAP ===================== */
+function drawMinimap(){
+  const size = minimap.width; // 224px (doubled from 112px)
+  const cell = size / COLS;
+  mctx.clearRect(0,0,size,size);
+
+  // High Contrast Base: Deep Dark Charcoal/Black Corridor Floor
+  mctx.fillStyle = '#0a0304';
+  mctx.fillRect(0,0,size,size);
+
+  // Render Map Cells with Clear Contrast
+  for(let y=0;y<ROWS;y++){
+    for(let x=0;x<COLS;x++){
+      if(maze[y][x]===1){
+        // Walls: Bright Solid Crimson Red with High-Contrast Border Edge
+        mctx.fillStyle='#801818';
+        mctx.fillRect(x*cell, y*cell, cell, cell);
+        mctx.fillStyle='#c82424';
+        mctx.fillRect(x*cell + 1, y*cell + 1, cell - 2, cell - 2);
+      } else {
+        // Corridors: Crisp dark path tile
+        mctx.fillStyle='#1a0c0c';
+        mctx.fillRect(x*cell, y*cell, cell, cell);
+      }
+    }
+  }
+
+  // Letters on Mini-map
+  mctx.font='10px "Press Start 2P", monospace';
+  mctx.textAlign='center';
+  mctx.textBaseline='middle';
+
+  Object.keys(letterState).forEach(ch=>{
+    const st=letterState[ch];
+    mctx.fillStyle=st.solved?'#2dff6a':'#ffcf3d';
+    mctx.fillText(ch, (st.x+0.5)*cell, (st.y+0.5)*cell+1);
+  });
+
+  // Monsters on Mini-map
+  monsters.forEach(m=>{
+    if(m.active){
+      mctx.fillStyle='#ff2222';
+      mctx.fillRect((m.x+0.2)*cell, (m.y+0.2)*cell, cell*0.6, cell*0.6);
+    }
+  });
+
+  // Player Position Indicator
+  mctx.save();
+  mctx.translate(player.x*cell, player.y*cell);
+  mctx.rotate(player.angle);
+  mctx.fillStyle='#4dd2ff';
+  mctx.beginPath();
+  mctx.moveTo(9,0);mctx.lineTo(-6,-6);mctx.lineTo(-6,6);mctx.closePath();
+  mctx.fill();
+  mctx.restore();
+}
+
+/* ===================== RESIZE ===================== */
+function resizeCanvas(){
+  const cw=window.innerWidth, ch=window.innerHeight;
+  const ratio=IW/IH;
+  let dw,dh;
+  if(cw/ch>ratio){dh=ch;dw=dh*ratio;}else{dw=cw;dh=dw/ratio;}
+  canvas.style.width=dw+'px';
+  canvas.style.height=dh+'px';
+  confettiCanvas.width=cw;
+  confettiCanvas.height=ch;
+  winConfettiCanvas.width=cw;
+  winConfettiCanvas.height=ch;
+}
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', resizeCanvas);
+
+/* ===================== AUDIO ===================== */
+function ensureAudio(){
+  if(!actx){
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+  } else if(actx.state==='suspended'){
+    actx.resume();
+  }
+}
+function beep(freq,dur,type,vol){
+  if(!actx) return;
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type; o.frequency.value=freq; g.gain.value=vol;
+  o.connect(g); g.connect(actx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+dur);
+  o.stop(actx.currentTime+dur+0.02);
+}
+function playCorrect(){ beep(660,0.09,'square',0.18); setTimeout(()=>beep(880,0.12,'square',0.18),90); }
+function playWrong(){ beep(120,0.18,'sawtooth',0.2); }
+function playMashTick(){ beep(300+Math.random()*120,0.03,'square',0.07); }
+function playRepelled(){ beep(520,0.08,'square',0.16); setTimeout(()=>beep(780,0.1,'square',0.16),80); setTimeout(()=>beep(1040,0.14,'square',0.16),160); }
+function playRoar(){
+  if(!actx) return;
+  const dur=0.9;
+  const bufferSize=Math.floor(actx.sampleRate*dur);
+  const buffer=actx.createBuffer(1,bufferSize,actx.sampleRate);
+  const data=buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++){ data[i]=(Math.random()*2-1)*Math.pow(1-i/bufferSize,1.5); }
+  const noise=actx.createBufferSource(); noise.buffer=buffer;
+  const filter=actx.createBiquadFilter(); filter.type='lowpass'; filter.frequency.value=380;
+  const g=actx.createGain(); g.gain.value=0.3;
+  noise.connect(filter); filter.connect(g); g.connect(actx.destination);
+  noise.start();
+  const o=actx.createOscillator(); o.type='sawtooth';
+  o.frequency.setValueAtTime(90, actx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(48, actx.currentTime+dur);
+  const g2=actx.createGain(); g2.gain.value=0.22;
+  o.connect(g2); g2.connect(actx.destination);
+  o.start(); o.stop(actx.currentTime+dur);
+}
+
+/* ===================== MONSTER COMBAT ===================== */
+function drawMonsterFace(variant){
+  const w=64,h=64;
+  mctx2.clearRect(0,0,w,h);
+  mctx2.fillStyle='#050303';
+  mctx2.fillRect(0,0,w,h);
+  mctx2.fillStyle=variant.skin;
+  mctx2.fillRect(w*0.14,h*0.14,w*0.72,h*0.7);
+  mctx2.fillRect(w*0.06,h*0.24,w*0.88,h*0.48);
+  mctx2.fillStyle='#050303';
+  mctx2.fillRect(0,0,w,h*0.08);
+  mctx2.fillRect(0,h*0.94,w,h*0.06);
+  mctx2.fillRect(0,0,w*0.05,h);
+  mctx2.fillRect(w*0.95,0,w*0.05,h);
+  mctx2.fillStyle=variant.eye;
+  mctx2.fillRect(w*0.24,h*0.34,w*0.18,h*0.15);
+  mctx2.fillRect(w*0.58,h*0.34,w*0.18,h*0.15);
+  mctx2.fillStyle='#000';
+  mctx2.fillRect(w*0.30,h*0.385,w*0.07,h*0.07);
+  mctx2.fillRect(w*0.64,h*0.385,w*0.07,h*0.07);
+  mctx2.fillStyle='#000';
+  mctx2.beginPath();
+  mctx2.moveTo(w*0.22,h*0.28);mctx2.lineTo(w*0.44,h*0.33);mctx2.lineTo(w*0.22,h*0.35);
+  mctx2.closePath();mctx2.fill();
+  mctx2.beginPath();
+  mctx2.moveTo(w*0.78,h*0.28);mctx2.lineTo(w*0.56,h*0.33);mctx2.lineTo(w*0.78,h*0.35);
+  mctx2.closePath();mctx2.fill();
+  mctx2.fillStyle='#1a0000';
+  mctx2.fillRect(w*0.28,h*0.62,w*0.44,h*0.17);
+  mctx2.fillStyle='#fff';
+  for(let i=0;i<5;i++){
+    mctx2.fillRect(w*0.29+i*w*0.086, h*0.62, w*0.055,h*0.075);
+    mctx2.fillRect(w*0.29+i*w*0.086, h*0.715, w*0.055,h*0.075);
+  }
+}
+function drawStatic(){
+  const w=64,h=64;
+  const img=mctx2.createImageData(w,h);
+  for(let i=0;i<img.data.length;i+=4){
+    const v=Math.random()*255;
+    img.data[i]=v; img.data[i+1]=v*0.3; img.data[i+2]=v*0.3; img.data[i+3]=255;
+  }
+  mctx2.putImageData(img,0,0);
+}
+
+function spawnConfetti(targetArr, targetCanvas, count=70){
+  const colors=['#2dff6a','#ffcf3d','#ff3b3b','#4dd2ff','#ff66cc','#ffffff'];
+  for(let i=0; i<count; i++){
+    const angle = Math.random() * Math.PI * 2;
+    const speed = rand(150, 450);
+    targetArr.push({
+      x: targetCanvas.width / 2,
+      y: targetCanvas.height / 2,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - rand(60, 160),
+      size: rand(5, 10),
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      vRot: rand(-360, 360),
+      life: 1.0
+    });
+  }
+}
+
+function drawConfetti(dt){
+  const cctx=confettiCanvas.getContext('2d');
+  cctx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
+  confettiParticles.forEach(p=>{
+    if(p.life<=0) return;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 320 * dt;
+    p.rotation += p.vRot * dt;
+    p.life -= dt * 1.6;
+    cctx.save();
+    cctx.translate(p.x, p.y);
+    cctx.rotate(p.rotation * Math.PI / 180);
+    cctx.fillStyle = p.color;
+    cctx.globalAlpha = Math.max(0, p.life);
+    cctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+    cctx.restore();
+  });
+}
+
+function triggerMonsterCombat(m){
+  activeEngagedMonster=m;
+  gameState='scare';
+  mashMeter=0;
+  isDefeating=false;
+  mashMeterInner.style.width='0%';
+  drawStatic();
+  scareOverlay.classList.add('show');
+  scareOverlay.classList.add('shaking');
+  ensureAudio();
+  playRoar();
+  setTimeout(()=>{ drawMonsterFace(m.variant); }, 130);
+  setTimeout(()=>{ scareOverlay.classList.remove('shaking'); }, 420);
+}
+
+function handleMashPress(){
+  if(gameState!=='scare' || isDefeating) return;
+  mashMeter=Math.min(METER_MAX, mashMeter+MASH_GAIN);
+  mashMeterInner.style.width=mashMeter+'%';
+  playMashTick();
+  monsterCanvas.classList.remove('punch');
+  void monsterCanvas.offsetWidth;
+  monsterCanvas.classList.add('punch');
+
+  if(mashMeter >= METER_MAX){
+    startDefeatAnimation();
+  }
+}
+
+scareOverlay.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  handleMashPress();
+}, {passive:false});
+
+scareOverlay.addEventListener('mousedown', e=>{
+  e.preventDefault();
+  handleMashPress();
+});
+
+function startDefeatAnimation(){
+  isDefeating=true;
+  monsterCanvas.classList.remove('punch');
+  monsterCanvas.classList.add('defeat');
+  confettiParticles = [];
+  spawnConfetti(confettiParticles, confettiCanvas, 70);
+  playRepelled();
+  
+  let startTime=performance.now();
+  function animLoop(now){
+    const dt=(now-startTime)/1000;
+    startTime=now;
+    drawConfetti(dt);
+    if(isDefeating){
+      requestAnimationFrame(animLoop);
+    }
+  }
+  requestAnimationFrame(animLoop);
+
+  setTimeout(()=>{
+    monsterCanvas.classList.remove('defeat');
+    confettiCanvas.getContext('2d').clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
+    resolveScareWin();
+  }, 620);
+}
+
+function resolveScareWin(){
+  isDefeating=false;
+  if(activeEngagedMonster){
+    activeEngagedMonster.active = false;
+  }
+  scareOverlay.classList.remove('show');
+  gameState='playing';
+  player.health=Math.min(100, player.health+10);
+  updateHUD();
+  showToast('MONSTER DEFEATED & CORRIDOR CLEARED!');
+}
+
+function playerDefeated(){
+  gameState='dead-reset';
+  scareOverlay.classList.remove('show');
+  deadOverlay.classList.remove('hidden');
+  setTimeout(()=>{
+    player.x=START_X+0.5; player.y=START_Y+0.5; player.angle=initialAngle();
+    player.health=100;
+    updateHUD();
+    deadOverlay.classList.add('hidden');
+    gameState='playing';
+  },1700);
+}
+
+/* ===================== PUZZLE MODAL & 10s COOLDOWN ===================== */
+function checkProximity(now){
+  for(const ch of Object.keys(letterState)){
+    const st=letterState[ch];
+    if(st.solved) continue;
+    if(st.snoozeUntil && now < st.snoozeUntil) continue;
+    const d=Math.hypot(st.x+0.5-player.x, st.y+0.5-player.y);
+    if(d<0.6){ openPuzzle(ch); return; }
+  }
+  for(const m of monsters){
+    if(m.active){
+      const d=Math.hypot(m.x+0.5-player.x, m.y+0.5-player.y);
+      if(d<0.75){
+        triggerMonsterCombat(m);
+        return;
+      }
+    }
+  }
+}
+
+function openPuzzle(ch){
+  gameState='puzzle';
+  activeLetter=ch;
+  isMasterActive=false;
+
+  if(letterState[ch]){
+    letterState[ch].snoozeUntil = performance.now() + COOLDOWN_MS;
+  }
+
+  const data=LETTER_DATA[ch];
+  puzzleLetter.textContent=ch;
+  puzzleEq.innerHTML='= '+data.eq;
+  puzzleDeps.innerHTML='';
+  if(data.deps.length){
+    data.deps.forEach(dch=>{
+      const solved=letterState[dch].solved;
+      const span=document.createElement('span');
+      span.className='depChip '+(solved?'known':'unknown');
+      span.textContent=solved? (dch+'='+letterState[dch].value) : (dch+'=?');
+      puzzleDeps.appendChild(span);
+    });
+  } else {
+    const span=document.createElement('span');
+    span.className='depChip known';
+    span.textContent='given directly!';
+    puzzleDeps.appendChild(span);
+  }
+  puzzleInput.value='';
+  puzzleFeedback.textContent='';
+  puzzleFeedback.className='';
+  puzzleModal.classList.add('show');
+  setTimeout(()=>puzzleInput.focus(),50);
+}
+
+function openMasterPuzzle(){
+  gameState='puzzle';
+  isMasterActive=true;
+  activeLetter=null;
+
+  puzzleLetter.textContent="MASTER GEMA";
+  puzzleLetter.style.fontSize="20px";
+  puzzleEq.innerHTML=MASTER_PUZZLE.eq;
+  puzzleDeps.innerHTML='';
+
+  MASTER_PUZZLE.deps.forEach(dch=>{
+    const span=document.createElement('span');
+    span.className='depChip known';
+    span.textContent=dch+'='+letterState[dch].value;
+    puzzleDeps.appendChild(span);
+  });
+
+  puzzleInput.value='';
+  puzzleFeedback.textContent='10 letters • Exponents & Brackets';
+  puzzleFeedback.className='';
+  puzzleModal.classList.add('show');
+  setTimeout(()=>puzzleInput.focus(),50);
+}
+
+function closePuzzle(){
+  puzzleModal.classList.remove('show');
+  puzzleLetter.style.fontSize="30px";
+  gameState='playing';
+}
+
+function cancelPuzzle(){
+  if(activeLetter && letterState[activeLetter]){
+    letterState[activeLetter].snoozeUntil = performance.now() + COOLDOWN_MS;
+    showToast(`Letter ${activeLetter} paused for 10s`, 1800);
+  }
+  closePuzzle();
+}
+
+function submitAnswer(){
+  const val=parseInt(puzzleInput.value,10);
+
+  if(isMasterActive){
+    if(val === MASTER_PUZZLE.targetValue){
+      playCorrect();
+      puzzleFeedback.textContent='🌟 MASTER PUZZLE SOLVED!';
+      puzzleFeedback.className='good';
+      setTimeout(()=>{
+        closePuzzle();
+        triggerWin();
+      }, 900);
+    } else {
+      playWrong();
+      puzzleFeedback.textContent='❌ INCORRECT (Check GEMA Order)';
+      puzzleFeedback.className='bad';
+      puzzleInput.select();
+    }
+    return;
+  }
+
+  const ch=activeLetter;
+  if(!ch) return;
+
+  if(val===LETTER_DATA[ch].value){
+    letterState[ch].solved=true;
+    solvedCount++;
+    playCorrect();
+    puzzleFeedback.textContent='✅ CORRECT!';
+    puzzleFeedback.className='good';
+    updateHUD();
+    setTimeout(()=>{
+      closePuzzle();
+      if(solvedCount>=26){
+        showToast('ALL 26 SOLVED! UNLOCKING MASTER GEMA PUZZLE...', 3000);
+        setTimeout(openMasterPuzzle, 1200);
+      }
+    },700);
+  } else {
+    playWrong();
+    if(letterState[ch]){
+      letterState[ch].snoozeUntil = performance.now() + COOLDOWN_MS;
+    }
+    puzzleFeedback.textContent='❌ TRY AGAIN (10s Cooldown Set)';
+    puzzleFeedback.className='bad';
+    puzzleInput.select();
+  }
+}
+
+puzzleSubmit.addEventListener('click', submitAnswer);
+puzzleCancel.addEventListener('click', cancelPuzzle);
+puzzleInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); submitAnswer(); }
+  if(e.key==='Escape'){ e.preventDefault(); cancelPuzzle(); }
+});
+
+/* ===================== HUD ===================== */
+function updateHUD(){
+  const pct=Math.max(0,Math.min(100,player.health));
+  hpFill.style.width=pct+'%';
+  hpNum.textContent=Math.round(pct);
+  hpFill.style.background = pct>60?'#2dff6a':(pct>30?'#ffcf3d':'#ff3b3b');
+  progressText.textContent='LETTERS '+solvedCount+'/26';
+  critOverlay.classList.toggle('active', pct<=CRIT_THRESHOLD);
+
+  notebookGrid.innerHTML='';
+  Object.keys(letterState).sort().forEach(ch=>{
+    const st=letterState[ch];
+    if(st.solved){
+      const chip=document.createElement('div');
+      chip.className='nbChip';
+      chip.textContent=ch+' = '+st.value;
+      notebookGrid.appendChild(chip);
+    }
+  });
+}
+notebookTab.addEventListener('click', ()=>notebookPanel.classList.toggle('open'));
+helpBtn.addEventListener('click', ()=>helpTip.classList.toggle('show'));
+
+/* ===================== INPUT ===================== */
+function keyIsMove(code){
+  return ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyW','KeyA','KeyS','KeyD','Space'].includes(code);
+}
+window.addEventListener('keydown', e=>{
+  if(keyIsMove(e.code)) e.preventDefault();
+  if(e.code==='ArrowUp'||e.code==='KeyW') controls.forward=true;
+  if(e.code==='ArrowDown'||e.code==='KeyS') controls.back=true;
+  if(e.code==='ArrowLeft'||e.code==='KeyA') controls.left=true;
+  if(e.code==='ArrowRight'||e.code==='KeyD') controls.right=true;
+  if(e.code==='Space') handleMashPress();
+});
+window.addEventListener('keyup', e=>{
+  if(e.code==='ArrowUp'||e.code==='KeyW') controls.forward=false;
+  if(e.code==='ArrowDown'||e.code==='KeyS') controls.back=false;
+  if(e.code==='ArrowLeft'||e.code==='KeyA') controls.left=false;
+  if(e.code==='ArrowRight'||e.code==='KeyD') controls.right=false;
+});
+document.addEventListener('touchmove', e=>{ if(gameState!=='start') e.preventDefault(); }, {passive:false});
+
+function bindHold(el, onDown, onUp){
+  el.addEventListener('touchstart', e=>{e.preventDefault();onDown();}, {passive:false});
+  el.addEventListener('touchend', e=>{e.preventDefault();onUp();}, {passive:false});
+  el.addEventListener('touchcancel', e=>{e.preventDefault();onUp();}, {passive:false});
+}
+bindHold(document.getElementById('tUp'), ()=>controls.forward=true, ()=>controls.forward=false);
+bindHold(document.getElementById('tDown'), ()=>controls.back=true, ()=>controls.back=false);
+bindHold(document.getElementById('tLeft'), ()=>controls.left=true, ()=>controls.left=false);
+bindHold(document.getElementById('tRight'), ()=>controls.right=true, ()=>controls.right=false);
+document.getElementById('tMash').addEventListener('touchstart', e=>{e.preventDefault();handleMashPress();}, {passive:false});
+
+/* ===================== WIN CONFETTI ANIMATION ===================== */
+function updateAndDrawWinConfetti(dt){
+  const wctx = winConfettiCanvas.getContext('2d');
+  wctx.clearRect(0, 0, winConfettiCanvas.width, winConfettiCanvas.height);
+  
+  if (Math.random() < 0.45) {
+    spawnConfetti(winConfettiParticles, winConfettiCanvas, 6);
+  }
+
+  winConfettiParticles.forEach((p, index) => {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 220 * dt;
+    p.rotation += p.vRot * dt;
+    p.life -= dt * 0.45;
+
+    if (p.life <= 0 || p.y > winConfettiCanvas.height + 20) {
+      winConfettiParticles.splice(index, 1);
+      return;
+    }
+
+    wctx.save();
+    wctx.translate(p.x, p.y);
+    wctx.rotate(p.rotation * Math.PI / 180);
+    wctx.fillStyle = p.color;
+    wctx.globalAlpha = Math.max(0, p.life);
+    wctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+    wctx.restore();
+  });
+}
+
+/* ===================== GAME LOOP ===================== */
+function update(dt, now){
+  if(gameState==='playing'){
+    if(controls.left) player.angle-=ROT_SPEED*dt;
+    if(controls.right) player.angle+=ROT_SPEED*dt;
+    let moveDir=0;
+    if(controls.forward) moveDir+=1;
+    if(controls.back) moveDir-=1;
+    if(moveDir!==0){
+      const nx=player.x+Math.cos(player.angle)*MOVE_SPEED*dt*moveDir;
+      const ny=player.y+Math.sin(player.angle)*MOVE_SPEED*dt*moveDir;
+      if(canMoveTo(nx, player.y)) player.x=nx;
+      if(canMoveTo(player.x, ny)) player.y=ny;
+    }
+    if(player.health<100){
+      player.health=Math.min(100, player.health+REGEN_RATE*dt);
+    }
+    checkProximity(now);
+    updateHUD();
+  } else if(gameState==='scare'){
+    if(!isDefeating){
+      mashMeter=Math.max(0, mashMeter-MASH_DECAY*dt);
+      mashMeterInner.style.width=mashMeter+'%';
+      player.health-=HEALTH_DRAIN*dt;
+      updateHUD();
+      if(player.health<=0){ player.health=0; updateHUD(); playerDefeated(); }
+    }
+  } else if(gameState==='won'){
+    updateAndDrawWinConfetti(dt);
+  }
+}
+
+function loop(now){
+  const dt=Math.min(0.05,(now-lastTime)/1000);
+  lastTime=now;
+  update(dt, now);
+  render(now);
+  drawMinimap();
+  requestAnimationFrame(loop);
+}
+
+/* ===================== WIN / START / RESET ===================== */
+function triggerWin(){
+  gameState='won';
+  winConfettiParticles = [];
+  spawnConfetti(winConfettiParticles, winConfettiCanvas, 120);
+  
+  winTable.innerHTML='';
+  Object.keys(LETTER_DATA).sort().forEach(ch=>{
+    const div=document.createElement('div');
+    div.textContent=ch+'='+LETTER_DATA[ch].value;
+    winTable.appendChild(div);
+  });
+  winOverlay.classList.remove('hidden');
+}
+
+function newGame(){
+  generateMaze();
+  placeLettersAndMonsters();
+  solvedCount=0;
+  player.x=START_X+0.5; player.y=START_Y+0.5; player.angle=initialAngle();
+  player.health=100;
+  updateHUD();
+  gameState='playing';
+}
+
+startBtn.addEventListener('click', ()=>{
+  ensureAudio();
+  startScreen.classList.add('hidden');
+  resizeCanvas();
+  newGame();
+  lastTime=performance.now();
+  requestAnimationFrame(loop);
+  showToast('ARROWS/WASD TO MOVE • CLEAR LETTERS A TO Z', 5000);
+});
+
+playAgainBtn.addEventListener('click', ()=>{
+  winOverlay.classList.add('hidden');
+  newGame();
+});
+
+resizeCanvas();
+})();
+</script>
+</body>
+</html>
